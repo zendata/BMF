@@ -332,7 +332,7 @@ function renderReading(chart, person, seq, signal) {
     editButton(),
   );
   reading.hidden = false;
-  document.title = `${person.name} · BMF`;
+  document.title = `${person.name} · iAngels`;
 }
 
 function renderHeader(chart, person) {

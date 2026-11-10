@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BMF</title>
-  <meta name="description" content="BMF casts a natal chart from a name, birth date, birth time, and birthplace.">
-  <meta name="theme-color" content="#f4efe6">
+  <title>iAngels</title>
+  <meta name="description" content="iAngels casts a natal chart from a name, birth date, birth time, and birthplace.">
+  <meta name="theme-color" content="#f7f8fa">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,620&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -17,8 +17,9 @@
   <div class="page">
     <header class="mast">
       <p class="eyebrow">Natal chart</p>
-      <h1>BMF</h1>
-      <p class="lede">Enter a name, a birth date, a birth time, and a birthplace. BMF asks CosmyDay for the natal chart, draws the wheel, and shows the other sky writing that service publishes for the Sun sign.</p>
+      <h1>iAngels</h1>
+      <p class="byline">by Jikara and Graham</p>
+      <p class="lede">Enter a name, a birth date, a birth time, and a birthplace. iAngels asks CosmyDay for the natal chart and draws the wheel.</p>
     </header>
 
     <main>
@@ -67,7 +68,7 @@
               <input id="time-unknown" type="checkbox">
               <span>I don’t know the birth time</span>
             </label>
-            <p class="hint">Use the time people would have read on a clock at the birthplace. If the time is missing, BMF casts the chart for noon and marks the Ascendant and houses as uncertain.</p>
+            <p class="hint">Use the time people would have read on a clock at the birthplace. If the time is missing, iAngels casts the chart for noon and marks the Ascendant and houses as uncertain.</p>
           </div>
         </div>
 
@@ -90,13 +91,13 @@
     </main>
 
     <footer>
-      <p>Planetary positions are calculated by <a href="https://cosmyday.com/">CosmyDay</a> with the Swiss Ephemeris. BMF displays that result and does not recompute the sky. Place search uses <a href="https://open-meteo.com/">Open-Meteo</a>.</p>
-      <p>The name stays in this browser. The birth date, time, and coordinates are sent to CosmyDay, and the place name is sent to Open-Meteo. BMF does not keep a copy.</p>
+      <p>Planetary positions are calculated by <a href="https://cosmyday.com/">CosmyDay</a> with the Swiss Ephemeris. iAngels displays that result and does not recompute the sky. Place search uses <a href="https://open-meteo.com/">Open-Meteo</a>.</p>
+      <p>The name stays in this browser. The birth date, time, and coordinates are sent to CosmyDay, and the place name is sent to Open-Meteo. iAngels does not keep a copy.</p>
       <p>Astrology is a symbolic tradition. A chart is not a prediction, and it is not medical, legal, or financial advice.</p>
     </footer>
   </div>
   <noscript>
-    <p>BMF needs JavaScript to request a chart.</p>
+    <p>iAngels needs JavaScript to request a chart.</p>
   </noscript>
   <script src="chart.js"></script>
   <script src="app.js"></script>
