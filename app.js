@@ -5,7 +5,9 @@ const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
 
 const form = document.querySelector("#chart-form");
 const nameInput = document.querySelector("#name");
-const dateInput = document.querySelector("#date");
+const monthInput = document.querySelector("#month");
+const dayInput = document.querySelector("#day");
+const yearInput = document.querySelector("#year");
 const timeInput = document.querySelector("#time");
 const unknownInput = document.querySelector("#time-unknown");
 const placeInput = document.querySelector("#place");
@@ -15,9 +17,8 @@ const castButton = document.querySelector("#cast");
 const statusLine = document.querySelector("#status");
 const reading = document.querySelector("#reading");
 
-const horizon = new Date();
-horizon.setUTCDate(horizon.getUTCDate() + 1);
-dateInput.max = horizon.toISOString().slice(0, 10);
+keepDigits(dayInput, 2);
+keepDigits(yearInput, 4);
 
 let selectedPlace = null;
 let placeQuery = 0;
@@ -232,11 +233,9 @@ async function castChart() {
 function readPerson() {
   const name = nameInput.value.trim().replace(/\s+/g, " ");
   if (!name) return { error: "Enter a name." };
-  const dateParts = dateInput.value.split("-").map(Number);
-  if (dateParts.length !== 3 || dateParts.some((part) => !part)) {
-    return { error: "Enter a birth date." };
-  }
-  const [year, month, day] = dateParts;
+  const birth = BMFChart.parseBirthDate(monthInput.value, dayInput.value, yearInput.value);
+  if (birth.error) return { error: birth.error };
+  const { year, month, day } = birth;
   const timeKnown = !unknownInput.checked;
   let hour = 12;
   let minute = 0;
@@ -269,6 +268,25 @@ function readPerson() {
     coordLabel: formatCoord(selectedPlace.latitude, selectedPlace.longitude),
     timezone: selectedPlace.timezone || "",
   };
+}
+
+function keepDigits(input, maxLength) {
+  input.addEventListener("beforeinput", (event) => {
+    if (event.inputType !== "insertText" || !/^\d$/.test(event.data || "")) return;
+    const entire = input.selectionStart === 0 && input.selectionEnd === input.value.length && input.value.length > 0;
+    if (entire) return;
+    // A full day or year has no room for another digit. Start the number again
+    // so the field can be corrected after the month has already been chosen.
+    if (input.value.length >= maxLength) {
+      event.preventDefault();
+      input.value = event.data;
+      input.setSelectionRange(1, 1);
+    }
+  });
+  input.addEventListener("input", () => {
+    const digits = input.value.replace(/\D/g, "").slice(0, maxLength);
+    if (digits !== input.value) input.value = digits;
+  });
 }
 
 function formatClock(hour, minute) {

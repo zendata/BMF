@@ -470,6 +470,41 @@ const BMFChart = (() => {
     return found ? found[1] : key;
   }
 
+  const MONTHS = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+
+  // The browser date control locks its day segment once a month and day are
+  // filled. The form collects the three parts separately and checks them here.
+  function parseBirthDate(monthRaw, dayRaw, yearRaw, now = new Date()) {
+    const monthText = String(monthRaw ?? "").trim();
+    const dayText = String(dayRaw ?? "").trim();
+    const yearText = String(yearRaw ?? "").trim();
+    if (!monthText || !dayText || !yearText) {
+      return { error: "Enter a month, a day, and a year." };
+    }
+    if (!/^\d{1,2}$/.test(monthText) || !/^\d{1,2}$/.test(dayText) || !/^\d{4}$/.test(yearText)) {
+      return { error: "Enter the day and the year as numbers." };
+    }
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const year = Number(yearText);
+    if (month < 1 || month > 12) return { error: "Choose a month." };
+    if (year < 1800) return { error: "Enter a year from 1800 onward." };
+    const days = new Date(year, month, 0).getDate();
+    if (day < 1 || day > days) {
+      return { error: `${MONTHS[month - 1]} doesn’t have ${day} days.` };
+    }
+    const limit = new Date(now);
+    limit.setUTCDate(limit.getUTCDate() + 1);
+    const dateKey = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    if (dateKey > limit.toISOString().slice(0, 10)) {
+      return { error: "Enter a birth date that has already happened." };
+    }
+    return { year, month, day };
+  }
+
   function condition(body) {
     if (!body) return "";
     const parts = [];
@@ -508,6 +543,8 @@ const BMFChart = (() => {
     chartRuler,
     aspectLabel,
     sortAspects,
+    MONTHS,
+    parseBirthDate,
     bodyLabel,
     condition,
     wheelLabel,

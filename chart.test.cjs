@@ -70,6 +70,25 @@ test("weighted balance and the traditional Libra ruler", () => {
   assert.equal(BMFChart.chartRuler(chart).rising, "Libra");
 });
 
+test("a birth date can change its day after the month is chosen", () => {
+  const june = BMFChart.parseBirthDate("6", "15", "1990", new Date("2026-11-10T00:00:00Z"));
+  assert.deepEqual({ year: june.year, month: june.month, day: june.day }, { year: 1990, month: 6, day: 15 });
+  const changed = BMFChart.parseBirthDate("6", "16", "1990", new Date("2026-11-10T00:00:00Z"));
+  assert.equal(changed.day, 16);
+  assert.equal(changed.month, 6);
+});
+
+test("an impossible day stays a date error instead of another month", () => {
+  const leap = BMFChart.parseBirthDate("2", "29", "1992", new Date("2026-11-10T00:00:00Z"));
+  assert.equal(leap.day, 29);
+  const ordinary = BMFChart.parseBirthDate("2", "29", "1990", new Date("2026-11-10T00:00:00Z"));
+  assert.match(ordinary.error, /February doesn’t have 29 days/);
+  const missing = BMFChart.parseBirthDate("6", "", "1990", new Date("2026-11-10T00:00:00Z"));
+  assert.match(missing.error, /month, a day, and a year/);
+  const future = BMFChart.parseBirthDate("12", "31", "2026", new Date("2026-11-10T00:00:00Z"));
+  assert.match(future.error, /already happened/);
+});
+
 test("initials use the first letters of up to three names", () => {
   assert.equal(BMFChart.initials("Ada Lovelace"), "AL");
   assert.equal(BMFChart.initials("Ada"), "AD");
