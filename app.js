@@ -1,6 +1,5 @@
 "use strict";
 
-const NATAL_URL = "https://api.cosmyday.com/natal";
 const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
 
 const form = document.querySelector("#chart-form");
@@ -211,14 +210,20 @@ async function castChart() {
       setStatus("The chart service returned an unexpected response.", "error");
       return;
     }
-    renderReading(chart, person, seq, chartController.signal);
+    renderReading(chart, person);
     setStatus("");
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     reading.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
   } catch (error) {
     if (error.name === "AbortError" || seq !== requestSeq) return;
     if (error.status === 400 || error.status === 422) {
-      setStatus("The chart service rejected that birth time or place.", "error");
+      setStatus(error.detail || "The chart service rejected that birth time or place.", "error");
+    } else if (error.status === 404) {
+      setStatus("This copy of the page has no chart server. The birth details were not sent.", "error");
+    } else if (error.status === 429) {
+      setStatus("The chart service is at its limit for now. Try again later.", "error");
+    } else if (error.status === 503) {
+      setStatus("The chart key is not on the server yet.", "error");
     } else if (error.status >= 500) {
       setStatus("The chart service had a problem. Try again in a moment.", "error");
     } else {
@@ -295,30 +300,38 @@ function formatClock(hour, minute) {
 }
 
 async function requestChart(person, signal) {
-  const response = await fetch(NATAL_URL, {
+  const response = await fetch("api/natal", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      year: person.year,
-      month: person.month,
-      day: person.day,
-      hour: person.hour,
-      minute: person.minute,
-      lat: person.place.latitude,
-      lon: person.place.longitude,
-    }),
+    body: JSON.stringify(BMFChart.natalRequest(person)),
     signal,
   });
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    const error = new Error(`Natal chart failed (${response.status})`);
+    error.status = response.status === 200 ? 502 : response.status;
+    throw error;
+  }
   if (!response.ok) {
     const error = new Error(`Natal chart failed (${response.status})`);
     error.status = response.status;
+    if (typeof payload?.error === "string") error.detail = payload.error;
     throw error;
   }
-  return response.json();
+  const chart = BMFChart.fromFreeAstro(payload);
+  if (chart.error) {
+    const error = new Error(chart.error);
+    error.status = 502;
+    error.detail = chart.error;
+    throw error;
+  }
+  return chart;
 }
 
-function renderReading(chart, person, seq, signal) {
-  const sunSign = chart.planets.Sun.sign;
+function renderReading(chart, person) {
   reading.replaceChildren(
     renderHeader(chart, person),
     renderBigThree(chart, person),
@@ -327,8 +340,7 @@ function renderReading(chart, person, seq, signal) {
     renderHouses(chart, person),
     renderPlanets(chart, person),
     renderAspects(chart),
-    renderWritingSection(sunSign, seq, signal),
-    renderSkySection(seq, signal),
+    renderReadings(chart),
     editButton(),
   );
   reading.hidden = false;
@@ -410,8 +422,8 @@ function renderWheelSection(chart, person) {
   figure.append(wrap);
   const caption = document.createElement("figcaption");
   caption.textContent = person.timeKnown
-    ? "Tropical zodiac, Placidus houses. The wheel is turned so the Ascendant is on the left. Positions calculated by CosmyDay."
-    : "Tropical zodiac, Placidus houses, turned so the noon Ascendant is on the left. Treat the angles and houses as uncertain. Positions calculated by CosmyDay.";
+    ? "Tropical zodiac, Placidus houses. The wheel is turned so the Ascendant is on the left. Positions calculated by FreeAstroAPI."
+    : "Tropical zodiac, Placidus houses, turned so the noon Ascendant is on the left. Treat the angles and houses as uncertain. Positions calculated by FreeAstroAPI.";
   figure.append(caption);
   section.append(figure);
   const legend = document.createElement("ul");
@@ -610,7 +622,7 @@ function renderAspects(chart) {
       BMFChart.aspectLabel(aspect.type),
       `${BMFChart.bodyLabel(aspect.a)} and ${BMFChart.bodyLabel(aspect.b)}`,
       BMFChart.formatArc(aspect.delta),
-      aspect.applying ? "Applying" : "Separating",
+      aspect.applying == null ? "—" : (aspect.applying ? "Applying" : "Separating"),
     ]) {
       const cell = document.createElement("td");
       cell.textContent = value;
@@ -628,160 +640,26 @@ function renderAspects(chart) {
   return section;
 }
 
-function renderWritingSection(sign, seq, signal) {
+function renderReadings(chart) {
   const section = el("section", { class: "section" });
-  section.append(el("h3", { text: "Writing for the Sun sign" }));
+  section.append(el("h3", { text: "Reading" }));
+  const readings = Array.isArray(chart.readings) ? chart.readings : [];
+  if (!readings.length) {
+    section.append(el("p", { text: "The positions are above. A written reading was not included with this chart." }));
+    return section;
+  }
   section.append(el("p", {
     class: "note",
-    text: `This is CosmyDay’s general ${sign} forecast. It is written for the Sun sign, not for the whole natal chart.`,
+    text: "These notes describe the chart that was just cast. They are not a forecast of the next week or month.",
   }));
-  const tabs = el("div", { class: "tabs", role: "tablist" });
-  const panels = el("div", {});
-  const specs = [
-    ["daily", "Today"],
-    ["weekly", "This week"],
-    ["monthly", "This month"],
-  ];
-  const panelNodes = {};
-  specs.forEach(([id, label], index) => {
-    const tab = document.createElement("button");
-    tab.type = "button";
-    tab.setAttribute("role", "tab");
-    tab.setAttribute("aria-selected", index === 0 ? "true" : "false");
-    tab.tabIndex = index === 0 ? 0 : -1;
-    tab.dataset.panel = id;
-    tab.textContent = label;
-    tab.addEventListener("click", () => selectWritingTab(tabs, panels, id));
-    tabs.append(tab);
-    const panel = el("div", { role: "tabpanel" });
-    panel.id = `writing-${id}`;
-    panel.hidden = index !== 0;
-    panel.append(el("p", { text: "Loading this reading…" }));
-    panels.append(panel);
-    panelNodes[id] = panel;
-  });
-  section.append(tabs, panels);
-  loadWritings(sign, panelNodes, seq, signal);
+  for (const group of readings) {
+    section.append(el("h4", { text: group.heading }));
+    for (const note of group.notes) {
+      if (note.title) section.append(el("h4", { text: note.title }));
+      if (note.body) section.append(prose(note.body));
+    }
+  }
   return section;
-}
-
-function selectWritingTab(tabs, panels, id) {
-  for (const tab of tabs.querySelectorAll("[role=tab]")) {
-    const on = tab.dataset.panel === id;
-    tab.setAttribute("aria-selected", on ? "true" : "false");
-    tab.tabIndex = on ? 0 : -1;
-  }
-  for (const panel of panels.children) panel.hidden = panel.id !== `writing-${id}`;
-}
-
-async function loadWritings(sign, panels, seq, signal) {
-  const slug = String(sign || "").toLowerCase();
-  const entries = await Promise.all(Object.keys(panels).map(async (kind) => {
-    try {
-      const response = await fetch(`https://api.cosmyday.com/content/${kind}/${encodeURIComponent(slug)}`, { signal });
-      if (!response.ok) throw new Error(String(response.status));
-      return [kind, await response.json()];
-    } catch (error) {
-      if (error.name === "AbortError") return [kind, null];
-      return [kind, { error: true }];
-    }
-  }));
-  if (seq !== requestSeq) return;
-  for (const [kind, data] of entries) {
-    const panel = panels[kind];
-    if (!panel) continue;
-    panel.replaceChildren();
-    if (!data || data.error) {
-      panel.append(el("p", { text: "This reading did not load. The chart above is unaffected." }));
-      continue;
-    }
-    const heading = writingHeading(kind, data);
-    if (heading) panel.append(el("p", { class: "note", text: heading }));
-    panel.append(prose(data.content));
-    if (data.closing) panel.append(prose(data.closing));
-    const dates = keyDates(data.key_dates);
-    if (dates) panel.append(dates);
-  }
-}
-
-function writingHeading(kind, data) {
-  if (kind === "daily" && data.date) return formatISODate(data.date);
-  if (kind === "weekly" && data.start_date && data.end_date) {
-    return `${formatISODate(data.start_date)} – ${formatISODate(data.end_date)}`;
-  }
-  if (kind === "monthly" && data.month_name) return `${data.month_name} ${data.year || ""}`.trim();
-  return "";
-}
-
-function renderSkySection(seq, signal) {
-  const section = el("section", { class: "section", id: "sky" });
-  section.append(el("h3", { text: "Current sky" }));
-  section.append(el("p", {
-    class: "note",
-    text: "Tonight’s Moon and the next notable sky events. These describe the sky now, not the birth chart.",
-  }));
-  const moon = el("div", { id: "sky-moon" });
-  moon.append(el("p", { text: "Loading the current sky…" }));
-  const events = el("div", { id: "sky-events" });
-  section.append(moon, events);
-  loadSky(moon, events, seq, signal);
-  return section;
-}
-
-async function loadSky(moonNode, eventsNode, seq, signal) {
-  const [moonResult, eventResult] = await Promise.allSettled([
-    fetch("https://api.cosmyday.com/content/moon", { signal }).then(readOk),
-    fetch("https://api.cosmyday.com/events/upcoming?days=45&min_importance=60&limit=6", { signal }).then(readOk),
-  ]);
-  if (seq !== requestSeq) return;
-  moonNode.replaceChildren();
-  if (moonResult.status === "fulfilled") {
-    const moon = moonResult.value.moon || {};
-    const bits = [moon.phase_name, moon.sign ? `Moon in ${moon.sign}` : "", Number.isFinite(moon.illumination) ? `${moon.illumination}% lit` : ""]
-      .filter(Boolean);
-    if (bits.length) moonNode.append(el("p", { class: "summary", text: bits.join(" · ") }));
-    if (moonResult.value.content) moonNode.append(prose(moonResult.value.content));
-  } else {
-    moonNode.append(el("p", { text: "Tonight’s Moon did not load." }));
-  }
-  eventsNode.replaceChildren();
-  if (eventResult.status !== "fulfilled" || !Array.isArray(eventResult.value.events)) {
-    eventsNode.append(el("p", { text: "The sky-event list did not load." }));
-    return;
-  }
-  const list = document.createElement("ul");
-  list.className = "events";
-  for (const event of eventResult.value.events) {
-    const item = document.createElement("li");
-    if (event.date) {
-      const time = document.createElement("time");
-      time.dateTime = event.date;
-      time.textContent = formatISODate(event.date);
-      item.append(time);
-    }
-    item.append(el("h4", { text: event.headline || "Sky event" }));
-    if (event.short) item.append(el("p", { text: event.short }));
-    const href = safeHttps(event.url);
-    if (href) {
-      const link = document.createElement("a");
-      link.href = href;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.textContent = "On CosmyDay";
-      item.append(link);
-    }
-    list.append(item);
-  }
-  if (!list.childElementCount) {
-    eventsNode.append(el("p", { text: "No notable events in the next 45 days were returned." }));
-  } else {
-    eventsNode.append(list);
-  }
-}
-
-async function readOk(response) {
-  if (!response.ok) throw new Error(String(response.status));
-  return response.json();
 }
 
 function prose(text) {
@@ -789,51 +667,10 @@ function prose(text) {
   if (!text) return wrap;
   for (const block of String(text).split(/\n{2,}/)) {
     const paragraph = document.createElement("p");
-    const lines = block.split(/\n/);
-    lines.forEach((line, index) => {
-      if (index) paragraph.append(document.createElement("br"));
-      paragraph.append(document.createTextNode(line));
-    });
+    paragraph.textContent = block;
     wrap.append(paragraph);
   }
   return wrap;
-}
-
-function keyDates(list) {
-  if (!Array.isArray(list) || !list.length) return null;
-  const ul = document.createElement("ul");
-  ul.className = "key-dates";
-  for (const item of list) {
-    const li = document.createElement("li");
-    if (item.date) {
-      const time = document.createElement("time");
-      time.dateTime = item.date;
-      time.textContent = formatISODate(item.date);
-      li.append(time);
-    }
-    if (item.title) li.append(el("strong", { text: item.title }));
-    if (item.description) li.append(el("p", { text: item.description }));
-    ul.append(li);
-  }
-  return ul;
-}
-
-function formatISODate(iso) {
-  const [year, month, day] = String(iso).split("-").map(Number);
-  if (!year || !month || !day) return String(iso || "");
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-    month: "long", day: "numeric", year: "numeric",
-  });
-}
-
-function safeHttps(url) {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol === "https:") return parsed.href;
-  } catch {
-    return null;
-  }
-  return null;
 }
 
 function editButton() {

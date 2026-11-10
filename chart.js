@@ -517,6 +517,237 @@ const BMFChart = (() => {
     return parts.join(" · ");
   }
 
+  const BODY_KEYS = {
+    sun: "Sun",
+    moon: "Moon",
+    mercury: "Mercury",
+    venus: "Venus",
+    mars: "Mars",
+    jupiter: "Jupiter",
+    saturn: "Saturn",
+    uranus: "Uranus",
+    neptune: "Neptune",
+    pluto: "Pluto",
+    northnode: "NorthNode",
+    truenode: "NorthNode",
+    meannode: "NorthNode",
+    southnode: "SouthNode",
+    chiron: "Chiron",
+    lilith: "Lilith",
+    meanlilith: "Lilith",
+    blackmoonlilith: "Lilith",
+  };
+
+  const ASPECT_KEYS = {
+    conjunction: "conjunction",
+    opposition: "opposition",
+    trine: "trine",
+    square: "square",
+    sextile: "sextile",
+    quincunx: "quincunx",
+    inconjunct: "quincunx",
+    semisextile: "semisextile",
+    semisquare: "semisquare",
+    sesquiquadrate: "sesquiquadrate",
+    sesquisquare: "sesquiquadrate",
+  };
+
+  const READING_SECTIONS = [
+    ["core_self", "Core"],
+    ["mind", "Mind"],
+    ["love_relating", "Love and relating"],
+    ["work_path", "Work"],
+    ["social_collective", "Others"],
+    ["karmic_healing", "Healing"],
+  ];
+
+  function compactName(value) {
+    return String(value || "").toLowerCase().replace(/[^a-z]/g, "");
+  }
+
+  function bodyKey(item) {
+    return BODY_KEYS[compactName(item?.id)] || BODY_KEYS[compactName(item?.name)] || null;
+  }
+
+  function dignityOf(item) {
+    const raw = item?.dignity ?? item?.essential_dignity ?? item?.essentialDignity;
+    if (typeof raw !== "string") return undefined;
+    const text = raw.toLowerCase();
+    if (text === "neutral" || text === "peregrine") return "neutral";
+    if (text === "rulership" || text === "domicile") return "domicile";
+    if (text === "exaltation" || text === "detriment" || text === "fall") return text;
+    return undefined;
+  }
+
+  function aspectKey(value) {
+    return ASPECT_KEYS[compactName(value)] || null;
+  }
+
+  function applyingOf(item) {
+    if (typeof item?.applying === "boolean") return item.applying;
+    const motion = compactName(item?.movement || item?.motion);
+    if (motion === "applying") return true;
+    if (motion === "separating") return false;
+    return null;
+  }
+
+  function prefersExisting(existingId, nextId) {
+    const next = String(nextId || "").toLowerCase();
+    const existing = String(existingId || "").toLowerCase();
+    if (!existing) return false;
+    if (existing.includes("true") && next.includes("mean")) return true;
+    return false;
+  }
+
+  // FreeAstroAPI returns a different chart shape. Fold it into the one the
+  // wheel, the tables, and the tests already understand.
+  function fromFreeAstro(payload) {
+    if (!payload || !Array.isArray(payload.planets)) {
+      return { error: "The chart service returned an unexpected response." };
+    }
+    const planets = {};
+    const sourceIds = {};
+    for (const item of payload.planets) {
+      const key = bodyKey(item);
+      const lon = Number(item?.abs_pos);
+      if (!key || !Number.isFinite(lon)) continue;
+      if (prefersExisting(sourceIds[key], item.id)) continue;
+      const place = placement(lon);
+      const house = Number(item.house);
+      const body = {
+        lon: place.lon,
+        sign: place.sign,
+        degInSign: Number.isFinite(Number(item.pos)) ? Number(item.pos) : place.lon % 30,
+        retrograde: Boolean(item.retrograde),
+      };
+      if (Number.isInteger(house) && house >= 1 && house <= 12) body.house = house;
+      const dignity = dignityOf(item);
+      if (dignity) body.dignity = dignity;
+      planets[key] = body;
+      sourceIds[key] = item.id || item.name;
+    }
+    if (planets.NorthNode && !planets.SouthNode) {
+      const opposite = placement(planets.NorthNode.lon + 180);
+      planets.SouthNode = {
+        lon: opposite.lon,
+        sign: opposite.sign,
+        degInSign: opposite.lon % 30,
+        retrograde: planets.NorthNode.retrograde,
+      };
+    }
+    const houses = Array.isArray(payload.houses) ? payload.houses : [];
+    const cusps = houses
+      .map((house) => ({ house: Number(house.house), lon: Number(house.abs_pos) }))
+      .filter((house) => house.house >= 1 && house.house <= 12 && Number.isFinite(house.lon))
+      .sort((a, b) => a.house - b.house);
+    const cuspLons = cusps.length === 12 && cusps.every((house, index) => house.house === index + 1)
+      ? cusps.map((house) => normLon(house.lon))
+      : [];
+    const angles = payload.angles || {};
+    const ascendant = Number(angles.asc);
+    const midheaven = Number(angles.mc);
+    const aspects = [];
+    for (const item of payload.aspects || []) {
+      const type = aspectKey(item.type);
+      const a = bodyKey({ name: item.p1, id: item.p1 });
+      const b = bodyKey({ name: item.p2, id: item.p2 });
+      const delta = Number(item.orb);
+      if (!type || !a || !b || !Number.isFinite(delta)) continue;
+      aspects.push({ type, a, b, delta, applying: applyingOf(item) });
+    }
+    if (!planets.Sun || !planets.Moon || !Number.isFinite(ascendant)) {
+      return { error: "The chart service returned an unexpected response." };
+    }
+    return {
+      planets,
+      ascendant: normLon(ascendant),
+      midheaven: Number.isFinite(midheaven) ? normLon(midheaven) : null,
+      cusps: cuspLons,
+      aspects,
+      readings: readingsFrom(payload),
+    };
+  }
+
+  function readingsFrom(payload) {
+    const sections = payload?.interpretation?.sections;
+    if (!sections || typeof sections !== "object") return [];
+    const readings = [];
+    for (const [id, heading] of READING_SECTIONS) {
+      const items = Array.isArray(sections[id]) ? sections[id] : [];
+      const notes = [];
+      for (const item of items) {
+        const title = String(item?.title || "").trim();
+        const body = String(item?.body || item?.content || "").trim();
+        if (!title && !body) continue;
+        notes.push({ title, body });
+      }
+      if (notes.length) readings.push({ heading, notes });
+    }
+    return readings;
+  }
+
+  function natalRequest(person) {
+    const place = person?.place || {};
+    const city = String(place.name || person?.placeLabel || "Birthplace").replace(/\s+/g, " ").trim().slice(0, 120);
+    const zone = typeof place.timezone === "string" && /^[A-Za-z_+-][A-Za-z0-9_+-/]{0,63}$/.test(place.timezone)
+      ? place.timezone
+      : "AUTO";
+    return {
+      year: person.year,
+      month: person.month,
+      day: person.day,
+      hour: person.hour,
+      minute: person.minute,
+      city: city || "Birthplace",
+      lat: place.latitude,
+      lng: place.longitude,
+      tz_str: zone,
+    };
+  }
+
+  function acceptNatalBody(body) {
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return { error: "The chart request was incomplete." };
+    }
+    const birth = parseBirthDate(body.month, body.day, body.year);
+    if (birth.error) return { error: birth.error };
+    const hour = Number(body.hour);
+    const minute = Number(body.minute);
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23 || !Number.isInteger(minute) || minute < 0 || minute > 59) {
+      return { error: "Enter a birth time, or mark the time as unknown." };
+    }
+    const lat = Number(body.lat);
+    const lng = Number(body.lng);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+      return { error: "Choose a birthplace from the list." };
+    }
+    const city = String(body.city || "Birthplace").replace(/\s+/g, " ").trim().slice(0, 120) || "Birthplace";
+    const zone = typeof body.tz_str === "string" && /^[A-Za-z_+-][A-Za-z0-9_+-/]{0,63}$/.test(body.tz_str)
+      ? body.tz_str
+      : "AUTO";
+    return {
+      request: {
+        year: birth.year,
+        month: birth.month,
+        day: birth.day,
+        time_known: true,
+        hour,
+        minute,
+        city,
+        lat,
+        lng,
+        tz_str: zone,
+        house_system: "placidus",
+        zodiac_type: "tropical",
+        include_speed: true,
+        include_dignity: true,
+        include_minor_aspects: true,
+        include_features: ["chiron", "lilith", "true_node"],
+        interpretation: { enable: true, style: "improved" },
+      },
+    };
+  }
+
   return {
     SIGNS,
     SIGN_GLYPH,
@@ -547,6 +778,9 @@ const BMFChart = (() => {
     parseBirthDate,
     bodyLabel,
     condition,
+    fromFreeAstro,
+    natalRequest,
+    acceptNatalBody,
     wheelLabel,
     buildWheel,
   };

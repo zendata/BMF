@@ -89,6 +89,62 @@ test("an impossible day stays a date error instead of another month", () => {
   assert.match(future.error, /already happened/);
 });
 
+test("a FreeAstro chart becomes the wheel's chart", () => {
+  const chart = BMFChart.fromFreeAstro({
+    planets: [
+      { id: "sun", name: "Sun", sign: "Gem", pos: 23.87, abs_pos: 83.87, house: 8, retrograde: false, dignity: "neutral" },
+      { id: "moon", name: "Moon", sign: "Pis", pos: 11.75, abs_pos: 341.75, house: 5, retrograde: false },
+      { id: "mars", name: "Mars", abs_pos: 10, house: 1, retrograde: true, dignity: "domicile" },
+      { id: "mean_node", name: "Mean Node", abs_pos: 10, house: 1 },
+      { id: "true_node", name: "North Node", abs_pos: 40, house: 2 },
+    ],
+    houses: Array.from({ length: 12 }, (_, index) => ({ house: index + 1, abs_pos: index * 30 })),
+    angles: { asc: 209.3, mc: 120 },
+    aspects: [
+      { p1: "Sun", p2: "Moon", type: "Square", orb: 2.5, applying: true },
+      { p1: "Asteroid", p2: "Sun", type: "Quincunx", orb: 1 },
+    ],
+    interpretation: {
+      sections: {
+        core_self: [{ title: "Sun in Gemini", body: "A note for this chart." }],
+        aspects: [{ title: "Skip aspect essays", body: "Not a section we show." }],
+      },
+    },
+  });
+  assert.equal(chart.planets.Sun.sign, "Gemini");
+  assert.equal(chart.planets.Moon.sign, "Pisces");
+  assert.equal(chart.planets.Sun.house, 8);
+  assert.equal(chart.planets.Mars.retrograde, true);
+  assert.equal(chart.planets.Mars.dignity, "domicile");
+  assert.equal(chart.planets.NorthNode.lon, 40);
+  assert.equal(chart.planets.SouthNode.sign, "Scorpio");
+  assert.equal(BMFChart.placement(chart.ascendant).sign, "Libra");
+  assert.equal(chart.cusps.length, 12);
+  assert.deepEqual(chart.aspects, [{ type: "square", a: "Sun", b: "Moon", delta: 2.5, applying: true }]);
+  assert.deepEqual(chart.readings, [{ heading: "Core", notes: [{ title: "Sun in Gemini", body: "A note for this chart." }] }]);
+  assert.equal(BMFChart.fromFreeAstro({ planets: [] }).error.includes("unexpected"), true);
+});
+
+test("the chart request carries the birth facts and not the name", () => {
+  const request = BMFChart.natalRequest({
+    name: "Ada Lovelace",
+    year: 1990,
+    month: 6,
+    day: 15,
+    hour: 14,
+    minute: 30,
+    place: { name: "Tokyo", latitude: 35.6895, longitude: 139.6917, timezone: "Asia/Tokyo" },
+  });
+  assert.equal(request.city, "Tokyo");
+  assert.equal(request.tz_str, "Asia/Tokyo");
+  assert.equal(Object.hasOwn(request, "name"), false);
+  const accepted = BMFChart.acceptNatalBody(request);
+  assert.equal(accepted.request.house_system, "placidus");
+  assert.equal(accepted.request.time_known, true);
+  assert.equal(accepted.request.interpretation.style, "improved");
+  assert.match(BMFChart.acceptNatalBody({ ...request, lat: 120 }).error, /birthplace/);
+});
+
 test("initials use the first letters of up to three names", () => {
   assert.equal(BMFChart.initials("Ada Lovelace"), "AL");
   assert.equal(BMFChart.initials("Ada"), "AD");
