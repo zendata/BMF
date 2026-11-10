@@ -1,7 +1,10 @@
 "use strict";
 
 // Serves the page and casts charts with FreeAstroAPI.
-// The key stays in FREE_ASTRO_API_KEY and is never sent to the browser.
+// Copy this file to server.cjs and paste the key between the quotes there.
+// server.cjs is gitignored, so the key stays off GitHub. Leave this example empty.
+const PASTED_KEY = "";
+
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -10,7 +13,9 @@ const { BMFChart } = require("./chart.js");
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT) || 8765;
 const UPSTREAM = process.env.FREE_ASTRO_API_BASE || "https://api.freeastroapi.com";
-const KEY = process.env.FREE_ASTRO_API_KEY || "";
+const KEY = (
+  path.basename(__filename) === "server.cjs" ? PASTED_KEY : process.env.FREE_ASTRO_API_KEY || ""
+).trim();
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -100,7 +105,9 @@ async function castNatal(request) {
   const hit = cached(key);
   if (hit) return hit;
 
-  if (!KEY) return { status: 503, body: { error: "The chart key is not on the server yet." } };
+  if (!KEY || KEY === "paste-your-key-here") {
+    return { status: 503, body: { error: "The chart key is not on the server yet." } };
+  }
   if (!allowUpstream()) {
     return { status: 429, body: { error: "The chart service is at its limit for now. Try again later." } };
   }
@@ -203,4 +210,7 @@ const server = http.createServer(async (request, response) => {
 
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`iAngels listening on http://127.0.0.1:${PORT}`);
+  if (!KEY || KEY === "paste-your-key-here") {
+    console.log("Paste the FreeAstroAPI key between the quotes in server.cjs, then run: node server.cjs");
+  }
 });

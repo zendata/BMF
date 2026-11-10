@@ -6,15 +6,21 @@ The name is only used as a heading. It is not sent with the chart request.
 
 ## Run it
 
-From this directory, with a FreeAstroAPI key in the environment:
+`server.example.cjs` is the chart server. It is in the repo with an empty key. Your own copy is not.
 
 ```bash
-FREE_ASTRO_API_KEY=your-key node server.cjs
+cp server.example.cjs server.cjs
 ```
 
-Open `http://127.0.0.1:8765`. The page is still HTML, CSS, and JavaScript with no build step. `server.cjs` serves those files and forwards one chart request to FreeAstroAPI. The key stays in that process. It is not written into the page.
+Open `server.cjs` and paste the FreeAstroAPI key between the quotes on `PASTED_KEY`. Then:
 
-GitHub Pages can publish the files, and it cannot keep that key. A chart cast on the Pages copy needs this server, or another host that runs it, in front of the same files.
+```bash
+node server.cjs
+```
+
+Open `http://127.0.0.1:8765`. That local page is where the key is used. The key stays in `server.cjs`, which git ignores, and it is not written into the browser page.
+
+GitHub Pages publishes the HTML, CSS, and JavaScript. It does not run `server.cjs`, so https://zendata.github.io/BMF/ can show the form and still cannot cast until this server is what the browser is talking to.
 
 ## Where the data comes from
 
