@@ -22,6 +22,16 @@ Open `http://127.0.0.1:8765`. That local page is where the key is used. The key 
 
 GitHub Pages publishes the HTML, CSS, and JavaScript. It does not run `server.cjs`, so https://zendata.github.io/BMF/ can show the form and still cannot cast until this server is what the browser is talking to.
 
+## Who calculates the chart
+
+`params.js` holds one switch:
+
+```javascript
+var owncalculation = 1;
+```
+
+`1` calculates the chart in the browser. That is the setting that works on GitHub Pages, because the page never needs the API key. `0` sends the birth date, time, and coordinates to FreeAstroAPI, which needs `server.cjs` and the key.
+
 ## Where the data comes from
 
 - **Chart.** `POST /api/natal` on this server calls [`POST https://api.freeastroapi.com/api/v1/natal/calculate`](https://www.freeastroapi.com/docs/western/natal). The zodiac is tropical and the houses are Placidus. An unknown birth time is sent as noon, and the page marks the Ascendant and houses as uncertain. The free plan allows 80 requests a day. This server keeps a successful chart for a day and stops at 70 upstream requests a day, so a repeated cast does not spend another request.

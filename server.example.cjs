@@ -101,6 +101,22 @@ async function castNatal(request) {
   }
   const accepted = BMFChart.acceptNatalBody(incoming);
   if (accepted.error) return { status: 400, body: { error: accepted.error } };
+  if (ownCalculation()) {
+    const chart = BMFChart.castOwn({
+      year: accepted.request.year,
+      month: accepted.request.month,
+      day: accepted.request.day,
+      hour: accepted.request.hour,
+      minute: accepted.request.minute,
+      place: {
+        latitude: accepted.request.lat,
+        longitude: accepted.request.lng,
+        timezone: accepted.request.tz_str,
+      },
+    });
+    if (chart.error) return { status: 500, body: { error: chart.error } };
+    return { status: 200, body: chart };
+  }
   const key = JSON.stringify(accepted.request);
   const hit = cached(key);
   if (hit) return hit;
@@ -160,6 +176,16 @@ function filePath(urlPath) {
   return full;
 }
 
+function ownCalculation() {
+  try {
+    const text = fs.readFileSync(path.join(ROOT, "params.js"), "utf8");
+    const match = text.match(/owncalculation\s*=\s*(\d+)/);
+    return !match || Number(match[1]) === 1;
+  } catch {
+    return true;
+  }
+}
+
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url, "http://127.0.0.1");
   if (url.pathname === "/api/natal") {
@@ -210,7 +236,9 @@ const server = http.createServer(async (request, response) => {
 
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`iAngels listening on http://127.0.0.1:${PORT}`);
-  if (!KEY || KEY === "paste-your-key-here") {
+  if (ownCalculation()) {
+    console.log("owncalculation is 1. Charts are calculated here, with no API key.");
+  } else if (!KEY || KEY === "paste-your-key-here") {
     console.log("Paste the FreeAstroAPI key between the quotes in server.cjs, then run: node server.cjs");
   }
 });

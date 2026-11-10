@@ -748,6 +748,299 @@ const BMFChart = (() => {
     };
   }
 
+  const DOMICILE = {
+    Sun: ["Leo"],
+    Moon: ["Cancer"],
+    Mercury: ["Gemini", "Virgo"],
+    Venus: ["Taurus", "Libra"],
+    Mars: ["Aries", "Scorpio"],
+    Jupiter: ["Sagittarius", "Pisces"],
+    Saturn: ["Capricorn", "Aquarius"],
+  };
+
+  const EXALTATION = {
+    Sun: "Aries",
+    Moon: "Taurus",
+    Mercury: "Virgo",
+    Venus: "Pisces",
+    Mars: "Capricorn",
+    Jupiter: "Cancer",
+    Saturn: "Libra",
+  };
+
+  const ASPECT_ORBS = [
+    ["conjunction", 0, 8],
+    ["opposition", 180, 8],
+    ["trine", 120, 8],
+    ["square", 90, 8],
+    ["sextile", 60, 6],
+    ["quincunx", 150, 3],
+    ["semisextile", 30, 2],
+    ["semisquare", 45, 2],
+    ["sesquiquadrate", 135, 2],
+  ];
+
+  function oppositeSign(sign) {
+    const index = SIGNS.indexOf(sign);
+    return index < 0 ? "" : SIGNS[(index + 6) % 12];
+  }
+
+  function dignityFor(name, sign) {
+    const homes = DOMICILE[name];
+    if (!homes) return undefined;
+    if (homes.includes(sign)) return "domicile";
+    if (homes.some((home) => oppositeSign(home) === sign)) return "detriment";
+    if (EXALTATION[name] === sign) return "exaltation";
+    if (oppositeSign(EXALTATION[name]) === sign) return "fall";
+    return "neutral";
+  }
+
+  function civilToUtc(year, month, day, hour, minute, timeZone) {
+    const desired = Date.UTC(year, month - 1, day, hour, minute, 0);
+    const zone = timeZone && timeZone !== "AUTO" ? timeZone : "UTC";
+    let formatter;
+    try {
+      formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: zone,
+        hourCycle: "h23",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+    } catch {
+      return new Date(desired);
+    }
+    let utc = desired;
+    for (let pass = 0; pass < 4; pass += 1) {
+      const map = {};
+      for (const part of formatter.formatToParts(new Date(utc))) {
+        if (part.type !== "literal") map[part.type] = part.value;
+      }
+      const shown = Date.UTC(
+        Number(map.year),
+        Number(map.month) - 1,
+        Number(map.day),
+        Number(map.hour) % 24,
+        Number(map.minute),
+        Number(map.second),
+      );
+      const drift = desired - shown;
+      if (drift === 0) break;
+      utc += drift;
+    }
+    return new Date(utc);
+  }
+
+  function julianCenturies(date) {
+    return (date.getTime() / 86400000 + 2440587.5 - 2451545) / 36525;
+  }
+
+  function meanObliquity(date) {
+    const t = julianCenturies(date);
+    return 23.4392911 - 0.013004167 * t - 1.64e-7 * t * t + 5.04e-7 * t * t * t;
+  }
+
+  function meanNode(date) {
+    const t = julianCenturies(date);
+    return normLon(
+      125.0445479
+      - 1934.1362891 * t
+      + 0.0020754 * t * t
+      + (t * t * t) / 467441
+      - (t * t * t * t) / 60616000,
+    );
+  }
+
+  function meanLilith(date) {
+    const t = julianCenturies(date);
+    const perigee = 83.3532465
+      + 4069.0137287 * t
+      - 0.01032 * t * t
+      - (t * t * t) / 80053
+      + (t * t * t * t) / 18999000;
+    return normLon(perigee + 180);
+  }
+
+  function astronomyLib() {
+    if (typeof Astronomy !== "undefined") return Astronomy;
+    if (typeof globalThis !== "undefined" && globalThis.Astronomy) return globalThis.Astronomy;
+    return null;
+  }
+
+  function eclipticLongitude(lib, body, date) {
+    const vector = lib.GeoVector(body, date, false);
+    return normLon(lib.Ecliptic(vector).elon);
+  }
+
+  function placidusCusps(ramc, latitude, obliquity) {
+    const rad = Math.PI / 180;
+    const ramcRad = ramc * rad;
+    const lat = latitude * rad;
+    const eps = obliquity * rad;
+    const asc = normLon(Math.atan2(
+      Math.cos(ramcRad),
+      -(Math.sin(ramcRad) * Math.cos(eps) + Math.tan(lat) * Math.sin(eps)),
+    ) * 180 / Math.PI);
+    const mc = normLon(Math.atan2(
+      Math.sin(ramcRad),
+      Math.cos(ramcRad) * Math.cos(eps),
+    ) * 180 / Math.PI);
+    if (Math.abs(latitude) > 66) return equalCusps(asc);
+
+    function longitudeFromRa(ra) {
+      return Math.atan2(Math.sin(ra), Math.cos(ra) * Math.cos(eps));
+    }
+
+    function intermediate(offset, factor) {
+      let ra = ramcRad + offset * rad;
+      for (let pass = 0; pass < 40; pass += 1) {
+        const lon = longitudeFromRa(ra);
+        const dec = Math.asin(Math.max(-1, Math.min(1, Math.sin(lon) * Math.sin(eps))));
+        const sine = Math.tan(lat) * Math.tan(dec);
+        if (Math.abs(sine) > 1) return null;
+        const ad = Math.asin(sine);
+        ra = ramcRad + offset * rad + factor * ad;
+      }
+      return normLon(longitudeFromRa(ra) * 180 / Math.PI);
+    }
+
+    const eleventh = intermediate(30, 1 / 3);
+    const twelfth = intermediate(60, 2 / 3);
+    const second = intermediate(120, 2 / 3);
+    const third = intermediate(150, 1 / 3);
+    if (![eleventh, twelfth, second, third].every((value) => Number.isFinite(value))) {
+      return equalCusps(asc);
+    }
+    return [
+      asc,
+      second,
+      third,
+      normLon(mc + 180),
+      normLon(eleventh + 180),
+      normLon(twelfth + 180),
+      normLon(asc + 180),
+      normLon(second + 180),
+      normLon(third + 180),
+      mc,
+      eleventh,
+      twelfth,
+    ];
+  }
+
+  function equalCusps(ascendant) {
+    return Array.from({ length: 12 }, (_, index) => normLon(ascendant + index * 30));
+  }
+
+  function houseOf(lon, cusps) {
+    for (let index = 0; index < cusps.length; index += 1) {
+      const span = (cusps[(index + 1) % cusps.length] - cusps[index] + 360) % 360;
+      const along = (normLon(lon) - cusps[index] + 360) % 360;
+      if (along <= span + 1e-9) return index + 1;
+    }
+    return null;
+  }
+
+  function forwardMotion(before, after) {
+    let delta = normLon(after) - normLon(before);
+    if (delta > 180) delta -= 360;
+    return delta;
+  }
+
+  function castOwn(person) {
+    const lib = astronomyLib();
+    if (!lib) return { error: "The calculation library did not load." };
+    const place = person?.place || {};
+    const latitude = Number(place.latitude);
+    const longitude = Number(place.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return { error: "Choose a birthplace from the list." };
+    }
+    const when = civilToUtc(
+      person.year,
+      person.month,
+      person.day,
+      person.hour,
+      person.minute,
+      place.timezone,
+    );
+    const later = new Date(when.getTime() + 60 * 60 * 1000);
+    const obliquity = meanObliquity(when);
+    const ramc = normLon(lib.SiderealTime(when) * 15 + longitude);
+    const cusps = placidusCusps(ramc, latitude, obliquity);
+    const catalog = [
+      ["Sun", lib.Body.Sun],
+      ["Moon", lib.Body.Moon],
+      ["Mercury", lib.Body.Mercury],
+      ["Venus", lib.Body.Venus],
+      ["Mars", lib.Body.Mars],
+      ["Jupiter", lib.Body.Jupiter],
+      ["Saturn", lib.Body.Saturn],
+      ["Uranus", lib.Body.Uranus],
+      ["Neptune", lib.Body.Neptune],
+      ["Pluto", lib.Body.Pluto],
+    ];
+    const at = (date) => {
+      const longs = {};
+      for (const [name, body] of catalog) longs[name] = eclipticLongitude(lib, body, date);
+      longs.NorthNode = meanNode(date);
+      longs.Lilith = meanLilith(date);
+      longs.SouthNode = normLon(longs.NorthNode + 180);
+      return longs;
+    };
+    const now = at(when);
+    const next = at(later);
+    const planets = {};
+    for (const [name, lon] of Object.entries(now)) {
+      const placeInSign = placement(lon);
+      const house = houseOf(lon, cusps);
+      const body = {
+        lon: placeInSign.lon,
+        sign: placeInSign.sign,
+        degInSign: normLon(lon) % 30,
+        retrograde: forwardMotion(lon, next[name]) < 0,
+      };
+      if (Number.isInteger(house)) body.house = house;
+      const dignity = dignityFor(name, placeInSign.sign);
+      if (dignity) body.dignity = dignity;
+      planets[name] = body;
+    }
+    const names = Object.keys(planets);
+    const aspects = [];
+    for (let i = 0; i < names.length; i += 1) {
+      for (let j = i + 1; j < names.length; j += 1) {
+        const a = names[i];
+        const b = names[j];
+        const gap = separation(planets[a].lon, planets[b].lon);
+        let chosen = null;
+        for (const [type, exact, orb] of ASPECT_ORBS) {
+          const delta = Math.abs(gap - exact);
+          if (delta <= orb && (!chosen || delta < chosen.delta)) chosen = { type, exact, delta };
+        }
+        if (!chosen) continue;
+        const laterGap = separation(next[a], next[b]);
+        aspects.push({
+          type: chosen.type,
+          a,
+          b,
+          delta: chosen.delta,
+          applying: Math.abs(laterGap - chosen.exact) < chosen.delta,
+        });
+      }
+    }
+    return {
+      planets,
+      ascendant: cusps[0],
+      midheaven: cusps[9],
+      cusps,
+      aspects,
+      readings: [],
+      source: "iAngels",
+    };
+  }
+
   return {
     SIGNS,
     SIGN_GLYPH,
@@ -781,6 +1074,7 @@ const BMFChart = (() => {
     fromFreeAstro,
     natalRequest,
     acceptNatalBody,
+    castOwn,
     wheelLabel,
     buildWheel,
   };

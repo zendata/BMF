@@ -2,6 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+global.Astronomy = require("./astronomy.browser.min.js");
 const { BMFChart } = require("./chart.js");
 
 test("signs wrap at Aries and across negative longitude", () => {
@@ -143,6 +144,39 @@ test("the chart request carries the birth facts and not the name", () => {
   assert.equal(accepted.request.time_known, true);
   assert.equal(accepted.request.interpretation.style, "improved");
   assert.match(BMFChart.acceptNatalBody({ ...request, lat: 120 }).error, /birthplace/);
+});
+
+test("iAngels can cast the Tokyo chart without an outside astrology service", () => {
+  const chart = BMFChart.castOwn({
+    year: 1990,
+    month: 6,
+    day: 15,
+    hour: 14,
+    minute: 30,
+    place: { latitude: 35.6895, longitude: 139.69171, timezone: "Asia/Tokyo" },
+  });
+  assert.equal(chart.planets.Sun.sign, "Gemini");
+  assert.ok(Math.abs(chart.planets.Sun.lon - 83.876) < 0.02);
+  assert.equal(chart.planets.Moon.sign, "Pisces");
+  assert.ok(Math.abs(chart.planets.Moon.lon - 341.752) < 0.02);
+  assert.equal(BMFChart.signOf(chart.ascendant), "Libra");
+  assert.ok(Math.abs(chart.ascendant - 209.298) < 0.02);
+  assert.equal(chart.cusps.length, 12);
+  assert.equal(chart.planets.Sun.house, 8);
+  assert.equal(chart.planets.Mars.dignity, "domicile");
+  assert.equal(chart.planets.NorthNode.retrograde, true);
+  assert.ok(Math.abs(BMFChart.normLon(chart.planets.SouthNode.lon - chart.planets.NorthNode.lon) - 180) < 0.001);
+  assert.ok(chart.aspects.some((aspect) => aspect.type === "square" || aspect.type === "trine"));
+  const polar = BMFChart.castOwn({
+    year: 1990,
+    month: 6,
+    day: 15,
+    hour: 12,
+    minute: 0,
+    place: { latitude: 78, longitude: 15, timezone: "UTC" },
+  });
+  assert.equal(polar.cusps.length, 12);
+  assert.ok(polar.cusps.every((cusp) => Number.isFinite(cusp)));
 });
 
 test("initials use the first letters of up to three names", () => {

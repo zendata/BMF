@@ -19,6 +19,23 @@ const reading = document.querySelector("#reading");
 keepDigits(dayInput, 2);
 keepDigits(yearInput, 4);
 
+if (!usesOwnCalculation()) {
+  const credit = document.querySelector("#credit");
+  const privacy = document.querySelector("#privacy");
+  if (credit) {
+    credit.replaceChildren(
+      document.createTextNode("Planetary positions are calculated by FreeAstroAPI. iAngels draws the wheel. Place search uses "),
+    );
+    const link = document.createElement("a");
+    link.href = "https://open-meteo.com/";
+    link.textContent = "Open-Meteo";
+    credit.append(link, document.createTextNode("."));
+  }
+  if (privacy) {
+    privacy.textContent = "The name stays in this browser. The birth date, time, and coordinates are sent to FreeAstroAPI to cast the chart, and the place name is sent to Open-Meteo. iAngels does not keep a copy.";
+  }
+}
+
 let selectedPlace = null;
 let placeQuery = 0;
 let placeController = null;
@@ -299,7 +316,25 @@ function formatClock(hour, minute) {
   return stamp.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
+function usesOwnCalculation() {
+  return typeof owncalculation === "undefined" || Number(owncalculation) !== 0;
+}
+
+function chartSource(chart) {
+  return chart?.source === "iAngels" || usesOwnCalculation() ? "iAngels" : "FreeAstroAPI";
+}
+
 async function requestChart(person, signal) {
+  if (usesOwnCalculation()) {
+    const chart = BMFChart.castOwn(person);
+    if (chart.error) {
+      const error = new Error(chart.error);
+      error.status = 500;
+      error.detail = chart.error;
+      throw error;
+    }
+    return chart;
+  }
   const response = await fetch("api/natal", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -421,9 +456,10 @@ function renderWheelSection(chart, person) {
   wrap.append(svg);
   figure.append(wrap);
   const caption = document.createElement("figcaption");
+  const source = chartSource(chart);
   caption.textContent = person.timeKnown
-    ? "Tropical zodiac, Placidus houses. The wheel is turned so the Ascendant is on the left. Positions calculated by FreeAstroAPI."
-    : "Tropical zodiac, Placidus houses, turned so the noon Ascendant is on the left. Treat the angles and houses as uncertain. Positions calculated by FreeAstroAPI.";
+    ? `Tropical zodiac, Placidus houses. The wheel is turned so the Ascendant is on the left. Positions calculated by ${source}.`
+    : `Tropical zodiac, Placidus houses, turned so the noon Ascendant is on the left. Treat the angles and houses as uncertain. Positions calculated by ${source}.`;
   figure.append(caption);
   section.append(figure);
   const legend = document.createElement("ul");

@@ -91,14 +91,16 @@
     </main>
 
     <footer>
-      <p>Planetary positions are calculated by FreeAstroAPI. iAngels draws the wheel and does not recompute the sky. Place search uses <a href="https://open-meteo.com/">Open-Meteo</a>.</p>
-      <p>The name stays in this browser. The birth date, time, and coordinates are sent to FreeAstroAPI to cast the chart, and the place name is sent to Open-Meteo. iAngels does not keep a copy.</p>
+      <p id="credit">Planetary positions are calculated by iAngels. Place search uses <a href="https://open-meteo.com/">Open-Meteo</a>.</p>
+      <p id="privacy">The name, birth date, time, and coordinates stay in this browser. The place name is sent to Open-Meteo. iAngels does not keep a copy.</p>
       <p>Astrology is a symbolic tradition. A chart is not a prediction, and it is not medical, legal, or financial advice.</p>
     </footer>
   </div>
   <noscript>
     <p>iAngels needs JavaScript to request a chart.</p>
   </noscript>
+  <script src="params.js"></script>
+  <script src="astronomy.browser.min.js"></script>
   <script src="chart.js"></script>
   <script src="app.js"></script>
 </body>
