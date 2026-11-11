@@ -27,6 +27,8 @@ var timing = "western";
 
 `timing` is `"western"` or `"eastern"`. Western is the tropical zodiac, measured from the March equinox. Eastern is the sidereal zodiac. `lahiriAyanamsa` in `chart.js` is 23°51'11" at J2000 and moves at 50.27 arcseconds a year, about 24.2 degrees in 2026. `castOwn` subtracts that angle from every longitude and from the house cusps. Do not move the birth date. Three weeks of calendar would swing the Moon almost a full circle. The same subtraction leaves house numbers unchanged and can change a sign when the degree inside the sign is smaller than the offset.
 
+`eastern-and-western-timing.pdf` is a 500-word account of the two timings. It does not say which one the parameter file uses. Leave that choice to the reader. `/admin` links to it.
+
 `/admin` (`admin/index.html`) lets Graham set `0` or `1` and western or eastern. Save writes `localStorage` key `iangels-settings`. `settings.js` prefers that over `params.js` in the browser that saved it. On the local server, Save also `POST`s `/api/params`, and `server.example.cjs` rewrites `params.js`. GitHub Pages cannot rewrite the file, so another device keeps the file defaults. “Use the parameter file” clears the browser override.
 
 ## Files
@@ -43,6 +45,7 @@ All of these sit at the repository root. Do not put them in a `BMF/` folder.
 | `params.js` | `owncalculation` and `timing`. |
 | `settings.js` | Browser override saved from `/admin`. |
 | `admin/index.html`, `admin/admin.js` | Settings page at `/admin`. |
+| `eastern-and-western-timing.pdf` | 500-word comparison. It names no chosen timing. |
 | `astronomy.browser.min.js` | Don Cross’s astronomy-engine, MIT, https://github.com/cosinekitty/astronomy. Keep the copyright notice. |
 | `chart.test.cjs` | `node --test`. No network. |
 | `server.example.cjs` | Optional local server. Empty key. |
