@@ -49,6 +49,25 @@ body {
 
 .mast { max-width: 40rem; margin-bottom: 1.75rem; }
 
+.settings-link {
+  position: absolute;
+  top: 1.15rem;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 999px;
+  color: var(--halo);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--line);
+  text-decoration: none;
+}
+
+.settings-link svg { width: 1.3rem; height: 1.3rem; }
+
+.settings-link:hover { background: #fff; color: #3d6794; }
+
 .eyebrow {
   margin: 0 0 0.35rem;
   color: var(--ink-soft);

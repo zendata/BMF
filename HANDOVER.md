@@ -108,6 +108,7 @@ Graham chose this and rejected the earlier versions:
 - The title is **iAngels**, in blue `#4d7eae` (`--halo`). The byline is “by Jikara and Graham”.
 - The typeface is Outfit, with a sans-serif fallback. No serif fonts. The first theme used Fraunces. He asked for that to be removed.
 - The background is `wings.jpg` under a white radial veil. That was mockup 3, the folded-wings photograph. Keep it faint. He wanted the page calm, not bright.
+- A gear at the top right of the front page links to `/admin`. The footer also has a Settings link.
 - The footer credits iAngels for the positions and Open-Meteo for place search. Do not add CosmyDay links. He removed that branding because the outside links pulled attention away from the app.
 - The page says astrology is symbolic and is not medical, legal, or financial advice. Keep that.
 
