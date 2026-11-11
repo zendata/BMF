@@ -6,13 +6,16 @@ The name is only used as a heading. It is not sent with the chart request.
 
 ## Who calculates the chart
 
-`params.js` holds one switch. The default is our own calculation:
+`params.js` holds two switches. The defaults are our own calculation and western timing:
 
 ```javascript
 var owncalculation = 1;
+var timing = "western";
 ```
 
 `1` calculates the planets, Placidus houses, and aspects in the browser. GitHub Pages can cast a chart with that setting, and no API key is required. `0` sends the birth date, time, and coordinates to FreeAstroAPI instead.
+
+`western` measures the signs from the March equinox. `eastern` measures them from the stars, using the Lahiri offset, about 24 degrees earlier. The birth date stays the same. https://zendata.github.io/BMF/admin sets either switch for the browser that saves it.
 
 ## Run it
 
@@ -30,7 +33,7 @@ FreeAstroAPI is used only when `owncalculation` is `0`. That path needs a key. C
 
 ## Where the data comes from
 
-- **Chart.** With `owncalculation` at `1`, the page calculates a tropical zodiac and Placidus houses. An unknown birth time is cast for noon, and the page marks the Ascendant and houses as uncertain. With `owncalculation` at `0`, the server calls [`POST https://api.freeastroapi.com/api/v1/natal/calculate`](https://www.freeastroapi.com/docs/western/natal).
+- **Chart.** With `owncalculation` at `1`, the page calculates Placidus houses. Western timing is the tropical zodiac. Eastern timing subtracts the Lahiri ayanamsa from those positions. An unknown birth time is cast for noon, and the page marks the Ascendant and houses as uncertain. With `owncalculation` at `0`, the server calls [`POST https://api.freeastroapi.com/api/v1/natal/calculate`](https://www.freeastroapi.com/docs/western/natal). Eastern timing asks that service for a sidereal chart.
 - **Place.** The [Open-Meteo geocoding API](https://open-meteo.com/en/docs/geocoding-api) turns a city name into latitude, longitude, and an IANA timezone. No API key. Those coordinates are what the chart uses, so the birthplace is the one the visitor chose.
 
 Birth details are not stored by this app. With the default switch, the date, time, and coordinates stay in the browser. The place name goes to Open-Meteo. The name stays in the browser.

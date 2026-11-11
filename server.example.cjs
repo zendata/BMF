@@ -108,6 +108,7 @@ async function castNatal(request) {
       day: accepted.request.day,
       hour: accepted.request.hour,
       minute: accepted.request.minute,
+      timing: accepted.request.zodiac_type === "sidereal" ? "eastern" : "western",
       place: {
         latitude: accepted.request.lat,
         longitude: accepted.request.lng,
@@ -176,18 +177,86 @@ function filePath(urlPath) {
   return full;
 }
 
-function ownCalculation() {
+function readParams() {
   try {
     const text = fs.readFileSync(path.join(ROOT, "params.js"), "utf8");
-    const match = text.match(/owncalculation\s*=\s*(\d+)/);
-    return !match || Number(match[1]) === 1;
+    const own = text.match(/owncalculation\s*=\s*(\d+)/);
+    const when = text.match(/timing\s*=\s*["'](western|eastern)["']/);
+    return {
+      owncalculation: !own || Number(own[1]) !== 0 ? 1 : 0,
+      timing: when && when[1] === "eastern" ? "eastern" : "western",
+    };
   } catch {
-    return true;
+    return { owncalculation: 1, timing: "western" };
+  }
+}
+
+function ownCalculation() {
+  return readParams().owncalculation === 1;
+}
+
+function writeParams(settings) {
+  const own = Number(settings.owncalculation) === 0 ? 0 : 1;
+  const timing = String(settings.timing).toLowerCase() === "eastern" ? "eastern" : "western";
+  const text = [
+    "// 1 = calculate the chart in the browser, which is what GitHub Pages can run.",
+    "// 0 = send the birth date, time, and coordinates to FreeAstroAPI.",
+    `var owncalculation = ${own};`,
+    "",
+    "// western = tropical zodiac, measured from the March equinox. This is the default.",
+    "// eastern = sidereal zodiac, measured from the stars. Lahiri, about 24 degrees earlier.",
+    `var timing = "${timing}";`,
+    "",
+  ].join("\n");
+  fs.writeFileSync(path.join(ROOT, "params.js"), text);
+  return { owncalculation: own, timing };
+}
+
+async function readJson(request, limit) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > limit) return { error: "The request was too large." };
+    chunks.push(chunk);
+  }
+  try {
+    return { body: JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}") };
+  } catch {
+    return { error: "The request was incomplete." };
   }
 }
 
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url, "http://127.0.0.1");
+  if (url.pathname === "/api/params") {
+    if (request.method === "GET") {
+      sendJson(response, 200, readParams());
+      return;
+    }
+    if (request.method !== "POST") {
+      sendJson(response, 405, { error: "Use POST to save the parameters." });
+      return;
+    }
+    const incoming = await readJson(request, 1024);
+    if (incoming.error) {
+      sendJson(response, 400, { error: incoming.error });
+      return;
+    }
+    const own = incoming.body?.owncalculation;
+    const when = incoming.body?.timing;
+    if (![0, 1, "0", "1"].includes(own) || (when !== "western" && when !== "eastern")) {
+      sendJson(response, 400, { error: "Choose 0 or 1, and western or eastern." });
+      return;
+    }
+    try {
+      sendJson(response, 200, writeParams({ owncalculation: own, timing: when }));
+    } catch {
+      sendJson(response, 500, { error: "The parameter file could not be saved." });
+    }
+    return;
+  }
+
   if (url.pathname === "/api/natal") {
     if (request.method !== "POST") {
       sendJson(response, 405, { error: "Use POST to cast a chart." });
@@ -213,7 +282,21 @@ const server = http.createServer(async (request, response) => {
     return;
   }
   const requested = url.pathname === "/" ? "/index.html" : url.pathname;
-  const full = filePath(requested);
+  let full = filePath(requested);
+  if (full) {
+    try {
+      if (fs.statSync(full).isDirectory()) {
+        if (!requested.endsWith("/")) {
+          response.writeHead(302, { Location: `${requested}/` });
+          response.end();
+          return;
+        }
+        full = filePath(`${requested}index.html`);
+      }
+    } catch {
+      full = null;
+    }
+  }
   if (!full) {
     response.writeHead(404);
     response.end();

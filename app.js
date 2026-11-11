@@ -289,6 +289,7 @@ function readPerson() {
     placeLabel: placeLabel(selectedPlace),
     coordLabel: formatCoord(selectedPlace.latitude, selectedPlace.longitude),
     timezone: selectedPlace.timezone || "",
+    timing: effectiveTiming(),
   };
 }
 
@@ -317,7 +318,7 @@ function formatClock(hour, minute) {
 }
 
 function usesOwnCalculation() {
-  return typeof owncalculation === "undefined" || Number(owncalculation) !== 0;
+  return effectiveOwnCalculation();
 }
 
 function chartSource(chart) {
@@ -363,6 +364,7 @@ async function requestChart(person, signal) {
     error.detail = chart.error;
     throw error;
   }
+  chart.timing = person.timing;
   return chart;
 }
 
@@ -411,6 +413,18 @@ function renderHeader(chart, person) {
   return header;
 }
 
+function zodiacSentence(chart, timeKnown) {
+  const eastern = chart.timing === "eastern";
+  const offset = eastern && Number.isFinite(chart.ayanamsa) ? `, ${BMFChart.formatArc(chart.ayanamsa)} behind the seasonal zodiac` : "";
+  const zodiac = eastern
+    ? `Eastern sidereal zodiac${offset}. Placidus houses.`
+    : "Western tropical zodiac, measured from the equinox. Placidus houses.";
+  const turn = timeKnown
+    ? " The wheel is turned so the Ascendant is on the left."
+    : " The wheel is turned so the noon Ascendant is on the left. Treat the angles and houses as uncertain.";
+  return `${zodiac}${turn} Positions calculated by ${chartSource(chart)}.`;
+}
+
 function nearSignEdge(body) {
   return body && (body.degInSign < 1 || body.degInSign > 29);
 }
@@ -456,10 +470,7 @@ function renderWheelSection(chart, person) {
   wrap.append(svg);
   figure.append(wrap);
   const caption = document.createElement("figcaption");
-  const source = chartSource(chart);
-  caption.textContent = person.timeKnown
-    ? `Tropical zodiac, Placidus houses. The wheel is turned so the Ascendant is on the left. Positions calculated by ${source}.`
-    : `Tropical zodiac, Placidus houses, turned so the noon Ascendant is on the left. Treat the angles and houses as uncertain. Positions calculated by ${source}.`;
+  caption.textContent = zodiacSentence(chart, person.timeKnown);
   figure.append(caption);
   section.append(figure);
   const legend = document.createElement("ul");

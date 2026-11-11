@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings · iAngels</title>
+  <meta name="description" content="Choose our own calculation or FreeAstroAPI, and western or eastern timing.">
+  <meta name="theme-color" content="#f7f8fa">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <div class="sky" aria-hidden="true"></div>
+  <div class="page">
+    <header class="mast">
+      <p class="eyebrow">Settings</p>
+      <h1>iAngels</h1>
+      <p class="byline">by Jikara and Graham</p>
+      <p class="lede">Choose how the next chart is cast. Western is the usual setting.</p>
+    </header>
+
+    <main>
+      <form id="settings-form" class="panel">
+        <fieldset class="choices">
+          <legend>Calculation</legend>
+          <label class="choice">
+            <input type="radio" name="owncalculation" value="1">
+            <span><strong>1 — Our own calculation</strong> The chart is worked out in the browser. This is the one that works on the public site.</span>
+          </label>
+          <label class="choice">
+            <input type="radio" name="owncalculation" value="0">
+            <span><strong>0 — FreeAstroAPI</strong> The birth date, time, and coordinates are sent to that service. It needs the local server and a key, so the public site cannot use it.</span>
+          </label>
+        </fieldset>
+
+        <fieldset class="choices">
+          <legend>Timing</legend>
+          <label class="choice">
+            <input type="radio" name="timing" value="western">
+            <span><strong>Western</strong> The signs are measured from the March equinox, so they stay with the seasons. This is the default.</span>
+          </label>
+          <label class="choice">
+            <input type="radio" name="timing" value="eastern">
+            <span><strong>Eastern</strong> The signs are measured from the stars, the Lahiri offset used in Indian astrology. They sit about 24 degrees earlier. The Sun takes about 25 days to travel that far, which is the gap people call three weeks. The birth date is not moved.</span>
+          </label>
+        </fieldset>
+
+        <div class="actions">
+          <button class="primary" type="submit">Save</button>
+          <button class="text-button" type="button" id="use-file">Use the parameter file</button>
+        </div>
+        <p id="status" class="status" role="status"></p>
+        <p class="hint" id="file-note"></p>
+      </form>
+      <p class="back-link"><a href="../">Back to the chart</a></p>
+    </main>
+  </div>
+  <script src="../params.js"></script>
+  <script src="../settings.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

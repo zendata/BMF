@@ -702,6 +702,7 @@ const BMFChart = (() => {
       lat: place.latitude,
       lng: place.longitude,
       tz_str: zone,
+      timing: chartTiming(person),
     };
   }
 
@@ -725,27 +726,28 @@ const BMFChart = (() => {
     const zone = typeof body.tz_str === "string" && /^[A-Za-z_+-][A-Za-z0-9_+-/]{0,63}$/.test(body.tz_str)
       ? body.tz_str
       : "AUTO";
-    return {
-      request: {
-        year: birth.year,
-        month: birth.month,
-        day: birth.day,
-        time_known: true,
-        hour,
-        minute,
-        city,
-        lat,
-        lng,
-        tz_str: zone,
-        house_system: "placidus",
-        zodiac_type: "tropical",
-        include_speed: true,
-        include_dignity: true,
-        include_minor_aspects: true,
-        include_features: ["chiron", "lilith", "true_node"],
-        interpretation: { enable: true, style: "improved" },
-      },
+    const eastern = chartTiming(body) === "eastern" || body.zodiac_type === "sidereal";
+    const request = {
+      year: birth.year,
+      month: birth.month,
+      day: birth.day,
+      time_known: true,
+      hour,
+      minute,
+      city,
+      lat,
+      lng,
+      tz_str: zone,
+      house_system: "placidus",
+      zodiac_type: eastern ? "sidereal" : "tropical",
+      include_speed: true,
+      include_dignity: true,
+      include_minor_aspects: true,
+      include_features: ["chiron", "lilith", "true_node"],
+      interpretation: { enable: true, style: "improved" },
     };
+    if (eastern) request.sidereal_ayanamsa = "lahiri";
+    return { request };
   }
 
   const DOMICILE = {
@@ -834,8 +836,24 @@ const BMFChart = (() => {
     return new Date(utc);
   }
 
+  function julianDay(date) {
+    return date.getTime() / 86400000 + 2440587.5;
+  }
+
   function julianCenturies(date) {
-    return (date.getTime() / 86400000 + 2440587.5 - 2451545) / 36525;
+    return (julianDay(date) - 2451545) / 36525;
+  }
+
+  // Lahiri ayanamsa: 23°51'11" at J2000, moving at 50.27" a year.
+  // That is the official Indian star offset. In 2026 it is about 24.2 degrees,
+  // which the Sun takes about 25 days to cross. The birth date is not shifted.
+  function lahiriAyanamsa(date) {
+    const years = (julianDay(date) - 2451545.0) / 365.25;
+    return 23 + 51 / 60 + 11 / 3600 + years * (50.27 / 3600);
+  }
+
+  function chartTiming(person) {
+    return String(person?.timing || "western").toLowerCase() === "eastern" ? "eastern" : "western";
   }
 
   function meanObliquity(date) {
@@ -992,6 +1010,13 @@ const BMFChart = (() => {
     };
     const now = at(when);
     const next = at(later);
+    const timing = chartTiming(person);
+    const ayanamsa = timing === "eastern" ? lahiriAyanamsa(when) : 0;
+    if (timing === "eastern") {
+      for (const name of Object.keys(now)) now[name] = normLon(now[name] - ayanamsa);
+      for (const name of Object.keys(next)) next[name] = normLon(next[name] - ayanamsa);
+      for (let index = 0; index < cusps.length; index += 1) cusps[index] = normLon(cusps[index] - ayanamsa);
+    }
     const planets = {};
     for (const [name, lon] of Object.entries(now)) {
       const placeInSign = placement(lon);
@@ -1038,6 +1063,8 @@ const BMFChart = (() => {
       aspects,
       readings: [],
       source: "iAngels",
+      timing,
+      ayanamsa,
     };
   }
 
@@ -1069,6 +1096,7 @@ const BMFChart = (() => {
     sortAspects,
     MONTHS,
     parseBirthDate,
+    lahiriAyanamsa,
     bodyLabel,
     condition,
     fromFreeAstro,

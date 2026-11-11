@@ -141,9 +141,14 @@ test("the chart request carries the birth facts and not the name", () => {
   assert.equal(Object.hasOwn(request, "name"), false);
   const accepted = BMFChart.acceptNatalBody(request);
   assert.equal(accepted.request.house_system, "placidus");
+  assert.equal(accepted.request.zodiac_type, "tropical");
+  assert.equal(Object.hasOwn(accepted.request, "timing"), false);
   assert.equal(accepted.request.time_known, true);
   assert.equal(accepted.request.interpretation.style, "improved");
   assert.match(BMFChart.acceptNatalBody({ ...request, lat: 120 }).error, /birthplace/);
+  const eastern = BMFChart.acceptNatalBody({ ...request, timing: "eastern" });
+  assert.equal(eastern.request.zodiac_type, "sidereal");
+  assert.equal(eastern.request.sidereal_ayanamsa, "lahiri");
 });
 
 test("iAngels can cast the Tokyo chart without an outside astrology service", () => {
@@ -177,6 +182,32 @@ test("iAngels can cast the Tokyo chart without an outside astrology service", ()
   });
   assert.equal(polar.cusps.length, 12);
   assert.ok(polar.cusps.every((cusp) => Number.isFinite(cusp)));
+});
+
+test("eastern timing moves the signs by the Lahiri offset and leaves the houses", () => {
+  const j2000 = new Date(Date.UTC(2000, 0, 1, 12, 0, 0));
+  assert.ok(Math.abs(BMFChart.lahiriAyanamsa(j2000) - (23 + 51 / 60 + 11 / 3600)) < 1e-9);
+
+  const person = {
+    year: 1990,
+    month: 3,
+    day: 25,
+    hour: 12,
+    minute: 0,
+    place: { latitude: 35.6895, longitude: 139.69171, timezone: "Asia/Tokyo" },
+  };
+  const western = BMFChart.castOwn({ ...person, timing: "western" });
+  const eastern = BMFChart.castOwn({ ...person, timing: "eastern" });
+  assert.equal(western.timing, "western");
+  assert.equal(eastern.timing, "eastern");
+  assert.equal(western.planets.Sun.sign, "Aries");
+  assert.equal(eastern.planets.Sun.sign, "Pisces");
+  const sunGap = BMFChart.normLon(western.planets.Sun.lon - eastern.planets.Sun.lon);
+  const moonGap = BMFChart.normLon(western.planets.Moon.lon - eastern.planets.Moon.lon);
+  assert.ok(Math.abs(sunGap - eastern.ayanamsa) < 1e-6);
+  assert.ok(Math.abs(moonGap - eastern.ayanamsa) < 1e-6);
+  assert.equal(western.planets.Sun.house, eastern.planets.Sun.house);
+  assert.ok(eastern.ayanamsa > 23 && eastern.ayanamsa < 25);
 });
 
 test("initials use the first letters of up to three names", () => {
