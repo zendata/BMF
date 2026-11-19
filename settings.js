@@ -58,12 +58,6 @@ function writeTimingCookie(timing) {
     + "; SameSite=Lax" + secure;
 }
 
-function clearTimingCookie() {
-  if (typeof document === "undefined") return;
-  const secure = location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = IANGELS_TIMING_COOKIE + "=; Max-Age=0; Path=" + siteCookiePath() + "; SameSite=Lax" + secure;
-}
-
 function chosenTiming() {
   const fromCookie = readTimingCookie();
   if (fromCookie) return fromCookie;
@@ -92,15 +86,6 @@ function rememberSettings(settings) {
     // The cookie is already stored. A blocked local store does not undo that.
   }
   return next;
-}
-
-function forgetSettings() {
-  clearTimingCookie();
-  try {
-    localStorage.removeItem(IANGELS_SETTINGS_KEY);
-  } catch {
-    // The cookie is already gone.
-  }
 }
 
 function renewTimingCookie() {
