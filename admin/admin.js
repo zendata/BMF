@@ -21,25 +21,20 @@ useFile.addEventListener("click", () => {
 });
 
 function showFileNote() {
-  const own = fileOwnCalculation() ? "1, our own calculation" : "0, FreeAstroAPI";
   const when = fileTiming() === "eastern" ? "eastern" : "western";
-  fileNote.textContent = `The parameter file says ${own}, and ${when} timing. On the public site, Save changes this browser. Another device keeps the parameter file until that file is edited.`;
+  fileNote.textContent = `The parameter file says ${when} timing. On the public site, Save stores a cookie in this browser. Another device keeps the parameter file until that file is edited.`;
 }
 
 function selectCurrent() {
-  const own = effectiveOwnCalculation() ? "1" : "0";
-  const when = effectiveTiming();
-  form.elements.owncalculation.value = own;
-  form.elements.timing.value = when;
+  form.elements.timing.value = effectiveTiming();
 }
 
 async function save() {
   const settings = rememberSettings({
-    owncalculation: form.elements.owncalculation.value,
     timing: form.elements.timing.value,
   });
   statusLine.className = "status";
-  statusLine.textContent = "Saved on this browser.";
+  statusLine.textContent = "Saved in a cookie on this browser.";
   try {
     const response = await fetch("../api/params", {
       method: "POST",
@@ -47,10 +42,9 @@ async function save() {
       body: JSON.stringify(settings),
     });
     if (!response.ok) return;
-    const own = settings.owncalculation === 0 ? "0, FreeAstroAPI" : "1, our own calculation";
     const when = settings.timing === "eastern" ? "eastern" : "western";
-    statusLine.textContent = "Saved on this browser and in the parameter file on this server.";
-    fileNote.textContent = `The parameter file on this server now says ${own}, and ${when} timing.`;
+    statusLine.textContent = "Saved in a cookie on this browser and in the parameter file on this server.";
+    fileNote.textContent = `The parameter file on this server now says ${when} timing.`;
   } catch {
     // GitHub Pages has no server to rewrite params.js. The browser copy is enough here.
   }
