@@ -310,6 +310,18 @@ a:focus-visible {
 
 .status { min-height: 1.3rem; margin: 0.8rem 0 0; }
 
+.timing-read { container-type: inline-size; }
+
+.timing-sheet {
+  display: block;
+  width: 100%;
+  height: calc(100cqw * 297 / 210 + 3rem);
+  margin: 0.4rem 0 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
 .status.error { color: var(--danger); }
 
 .reading {
