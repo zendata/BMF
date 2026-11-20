@@ -21,23 +21,6 @@ const angelsPanel = document.querySelector("#angels");
 keepDigits(dayInput, 2);
 keepDigits(yearInput, 4);
 
-if (!usesOwnCalculation()) {
-  const credit = document.querySelector("#credit");
-  const privacy = document.querySelector("#privacy");
-  if (credit) {
-    credit.replaceChildren(
-      document.createTextNode("Planetary positions are calculated by FreeAstroAPI. iAngels draws the wheel. Place search uses "),
-    );
-    const link = document.createElement("a");
-    link.href = "https://open-meteo.com/";
-    link.textContent = "Open-Meteo";
-    credit.append(link, document.createTextNode("."));
-  }
-  if (privacy) {
-    privacy.textContent = "The name stays in this browser. The birth date, time, and coordinates are sent to FreeAstroAPI to cast the chart, and the place name is sent to Open-Meteo. iAngels does not keep a copy.";
-  }
-}
-
 let selectedPlace = null;
 let placeQuery = 0;
 let placeController = null;
