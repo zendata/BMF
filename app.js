@@ -13,8 +13,10 @@ const placeInput = document.querySelector("#place");
 const placeList = document.querySelector("#place-list");
 const placePicked = document.querySelector("#place-picked");
 const castButton = document.querySelector("#cast");
+const myAngelsButton = document.querySelector("#my-angels");
 const statusLine = document.querySelector("#status");
 const reading = document.querySelector("#reading");
+const angelsPanel = document.querySelector("#angels");
 
 keepDigits(dayInput, 2);
 keepDigits(yearInput, 4);
@@ -88,6 +90,67 @@ form.addEventListener("submit", (event) => {
   event.preventDefault();
   castChart();
 });
+
+myAngelsButton.addEventListener("click", () => {
+  showMyAngels(new Date());
+});
+
+let angelIndex = null;
+
+async function showMyAngels(now) {
+  myAngelsButton.disabled = true;
+  statusLine.className = "status";
+  statusLine.textContent = "";
+  try {
+    if (!angelIndex) angelIndex = createAngelIndex(await loadAngelCatalog());
+    renderAngels(angelIndex.at(now), now);
+  } catch {
+    statusLine.className = "status error";
+    statusLine.textContent = "The angel list could not be read.";
+  } finally {
+    myAngelsButton.disabled = false;
+  }
+}
+
+async function loadAngelCatalog() {
+  const response = await fetch("angels.json");
+  if (!response.ok) throw new Error("angels");
+  return response.json();
+}
+
+function renderAngels(found, now) {
+  const header = el("header", {});
+  header.append(el("p", { class: "eyebrow", text: "My angels" }));
+  header.append(el("h2", { text: "The angels for this moment" }));
+  header.append(el("p", { class: "reading-meta", text: formatAngelWhen(now) }));
+  const grid = el("div", { class: "big-three" });
+  grid.append(angelCard("Intellect", [found.intellect]));
+  grid.append(angelCard("Guardian", [found.guardian]));
+  grid.append(angelCard("Heart", found.heart));
+  angelsPanel.replaceChildren(header, grid);
+  angelsPanel.hidden = false;
+  angelsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function angelCard(kind, matches) {
+  const card = el("article", { class: "sign-card angel-card" });
+  card.append(el("p", { class: "eyebrow", text: kind }));
+  const present = matches.filter((match) => match && match.angel);
+  if (!present.length) {
+    card.append(el("p", { text: "No angel is listed for this moment." }));
+    return card;
+  }
+  present.forEach((match, index) => {
+    const block = el("div", { class: index ? "angel-pair" : "" });
+    block.append(el("h3", { text: match.angel.name }));
+    block.append(el("p", { class: "number", text: `Angel ${match.angel.number} · ${match.angel.pronunciation}` }));
+    block.append(el("p", { text: match.label }));
+    block.append(el("p", { text: match.angel.quality }));
+    block.append(el("p", { class: "oil", text: `${match.angel.oil} — ${match.angel.oilQuality}` }));
+    card.append(block);
+  });
+  return card;
+}
 
 async function searchPlaces(query, ticket) {
   placeController?.abort();
