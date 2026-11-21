@@ -79,6 +79,19 @@ test("a birth date can change its day after the month is chosen", () => {
   assert.equal(changed.month, 6);
 });
 
+test("an afternoon time written with p.m. is 15:15", () => {
+  assert.deepEqual(BMFChart.parseClock("03:15 p.m."), { hour: 15, minute: 15 });
+  assert.deepEqual(BMFChart.parseClock("3:15 pm"), { hour: 15, minute: 15 });
+  assert.deepEqual(BMFChart.parseClock("3:15pm"), { hour: 15, minute: 15 });
+  assert.deepEqual(BMFChart.parseClock("3.15 p.m."), { hour: 15, minute: 15 });
+  assert.deepEqual(BMFChart.parseClock("15:15"), { hour: 15, minute: 15 });
+  assert.deepEqual(BMFChart.parseClock("3:15 am"), { hour: 3, minute: 15 });
+  assert.deepEqual(BMFChart.parseClock("12:00 am"), { hour: 0, minute: 0 });
+  assert.deepEqual(BMFChart.parseClock("12:00 pm"), { hour: 12, minute: 0 });
+  assert.equal(BMFChart.parseClock("3:60 pm"), null);
+  assert.equal(BMFChart.parseClock("13:15 pm"), null);
+});
+
 test("an impossible day stays a date error instead of another month", () => {
   const leap = BMFChart.parseBirthDate("2", "29", "1992", new Date("2026-11-10T00:00:00Z"));
   assert.equal(leap.day, 29);

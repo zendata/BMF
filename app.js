@@ -45,12 +45,13 @@ function scheduleNatalSave() {
 }
 
 function saveNatalForm() {
+  const clock = BMFChart.parseClock(timeInput.value);
   writeNatalCookie({
     name: nameInput.value,
     month: monthInput.value,
     day: dayInput.value,
     year: yearInput.value,
-    time: timeInput.value.slice(0, 5),
+    time: clock ? `${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}` : "",
     timeUnknown: unknownInput.checked,
     placeText: selectedPlace ? "" : placeInput.value,
     place: selectedPlace,
@@ -335,10 +336,10 @@ function readPerson() {
   let hour = 12;
   let minute = 0;
   if (timeKnown) {
-    const match = /^(\d{2}):(\d{2})$/.exec(timeInput.value);
-    if (!match) return { error: "Enter a birth time, or mark the time as unknown." };
-    hour = Number(match[1]);
-    minute = Number(match[2]);
+    const clock = BMFChart.parseClock(timeInput.value);
+    if (!clock) return { error: "Enter a birth time such as 3:15 pm, or mark the time as unknown." };
+    hour = clock.hour;
+    minute = clock.minute;
   }
   if (!selectedPlace || !Number.isFinite(selectedPlace.latitude) || !Number.isFinite(selectedPlace.longitude)) {
     return { error: "Choose a birthplace from the list." };
@@ -377,7 +378,7 @@ function restoreNatalForm() {
   unknownInput.checked = saved.timeUnknown;
   timeInput.disabled = saved.timeUnknown;
   timeInput.required = !saved.timeUnknown;
-  timeInput.value = saved.timeUnknown ? "" : saved.time;
+  timeInput.value = saved.timeUnknown ? "" : clockText(saved.time);
   if (saved.place) {
     selectedPlace = saved.place;
     placeInput.value = placeLabel(saved.place);
@@ -407,6 +408,14 @@ function keepDigits(input, maxLength) {
     const digits = input.value.replace(/\D/g, "").slice(0, maxLength);
     if (digits !== input.value) input.value = digits;
   });
+}
+
+function clockText(value) {
+  const clock = BMFChart.parseClock(value);
+  if (!clock) return "";
+  const suffix = clock.hour >= 12 ? "pm" : "am";
+  const hour = clock.hour % 12 || 12;
+  return `${hour}:${String(clock.minute).padStart(2, "0")} ${suffix}`;
 }
 
 function formatClock(hour, minute) {

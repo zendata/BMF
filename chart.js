@@ -475,6 +475,27 @@ const BMFChart = (() => {
     "July", "August", "September", "October", "November", "December",
   ];
 
+  // "03:15 p.m.", "3:15 pm", and "15:15" are the same afternoon minute.
+  function parseClock(value) {
+    let text = String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+    if (!text) return null;
+    text = text.replace(/a\.?\s*m\.?/g, "am").replace(/p\.?\s*m\.?/g, "pm").replace(/\s+/g, "");
+    const match = /^(\d{1,2})[:.](\d{2})(am|pm)?$/.exec(text);
+    if (!match) return null;
+    let hour = Number(match[1]);
+    const minute = Number(match[2]);
+    const suffix = match[3] || "";
+    if (minute > 59) return null;
+    if (suffix) {
+      if (hour < 1 || hour > 12) return null;
+      if (suffix === "am") hour = hour === 12 ? 0 : hour;
+      else hour = hour === 12 ? 12 : hour + 12;
+    } else if (hour > 23) {
+      return null;
+    }
+    return { hour, minute };
+  }
+
   // The browser date control locks its day segment once a month and day are
   // filled. The form collects the three parts separately and checks them here.
   function parseBirthDate(monthRaw, dayRaw, yearRaw, now = new Date()) {
@@ -1096,6 +1117,7 @@ const BMFChart = (() => {
     sortAspects,
     MONTHS,
     parseBirthDate,
+    parseClock,
     lahiriAyanamsa,
     bodyLabel,
     condition,
