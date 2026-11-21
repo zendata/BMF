@@ -35,6 +35,31 @@ unknownInput.addEventListener("change", () => {
   if (unknown) timeInput.value = "";
 });
 
+let natalSaveTimer = 0;
+let restoringNatal = false;
+
+function scheduleNatalSave() {
+  if (restoringNatal) return;
+  window.clearTimeout(natalSaveTimer);
+  natalSaveTimer = window.setTimeout(saveNatalForm, 200);
+}
+
+function saveNatalForm() {
+  writeNatalCookie({
+    name: nameInput.value,
+    month: monthInput.value,
+    day: dayInput.value,
+    year: yearInput.value,
+    time: timeInput.value.slice(0, 5),
+    timeUnknown: unknownInput.checked,
+    placeText: selectedPlace ? "" : placeInput.value,
+    place: selectedPlace,
+  });
+}
+
+form.addEventListener("input", scheduleNatalSave);
+form.addEventListener("change", scheduleNatalSave);
+
 placeInput.addEventListener("input", () => {
   selectedPlace = null;
   placePicked.textContent = "Choose a place from the list so the chart has coordinates.";
@@ -218,6 +243,7 @@ function choosePlace(place) {
   placeInput.value = placeLabel(place);
   placePicked.textContent = `${placeLabel(place)} · ${formatCoord(place.latitude, place.longitude)} · ${place.timezone || "timezone unknown"}`;
   closePlaces();
+  saveNatalForm();
 }
 
 function openPlaces() {
@@ -259,6 +285,7 @@ async function castChart() {
     setStatus(person.error, "error");
     return;
   }
+  saveNatalForm();
 
   chartController?.abort();
   chartController = new AbortController();
@@ -338,6 +365,30 @@ function readPerson() {
     timing: effectiveTiming(),
   };
 }
+
+function restoreNatalForm() {
+  const saved = readNatalCookie();
+  if (!saved) return;
+  restoringNatal = true;
+  nameInput.value = saved.name;
+  if (saved.month) monthInput.value = saved.month;
+  dayInput.value = saved.day;
+  yearInput.value = saved.year;
+  unknownInput.checked = saved.timeUnknown;
+  timeInput.disabled = saved.timeUnknown;
+  timeInput.required = !saved.timeUnknown;
+  timeInput.value = saved.timeUnknown ? "" : saved.time;
+  if (saved.place) {
+    selectedPlace = saved.place;
+    placeInput.value = placeLabel(saved.place);
+    placePicked.textContent = `${placeLabel(saved.place)} · ${formatCoord(saved.place.latitude, saved.place.longitude)} · ${saved.place.timezone || "timezone unknown"}`;
+  } else if (saved.placeText) {
+    placeInput.value = saved.placeText;
+  }
+  restoringNatal = false;
+}
+
+restoreNatalForm();
 
 function keepDigits(input, maxLength) {
   input.addEventListener("beforeinput", (event) => {
